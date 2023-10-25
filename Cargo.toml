@@ -1,19 +1,22 @@
-[workspace]
-members = [
-    "host",
-    "methods",
-]
 
-# Always optimize; building and running the guest takes much longer without optimization.
-[profile.dev]
-opt-level = 3
 
-[profile.dev.build-override]
-opt-level = 3
 
-[profile.release]
-debug = 1
-lto = true
+[package]
+name = "wordle"
+version = "0.1.0"
+edition = "2021"
 
-[profile.release.build-override]
-opt-level = 3
+[dependencies]
+rand = "0.8.5"
+risc0-zkvm = { path = "../risc0/risc0/zkvm" }
+serde = "1.0"
+wordle-core = { path = "core" }
+wordle-methods = { path = "methods" }
+
+[dev-dependencies]
+serial_test = "2.0"
+
+[features]
+cuda = ["risc0-zkvm/cuda"]
+default = []
+metal = ["risc0-zkvm/metal"]

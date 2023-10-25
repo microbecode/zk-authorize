@@ -1,11 +1,10 @@
 [package]
-# TODO: Rename this package to change the method name from METHOD_NAME
-name = "multiply"
+name = "wordle-guest"
 version = "0.1.0"
 edition = "2021"
 
 [workspace]
 
 [dependencies]
-# If you want to try (experimental) std support, add `features = [ "std" ]` to risc0-zkvm
-risc0-zkvm = { version = "0.18.0", default-features = false }
+risc0-zkvm = { path = "../../../risc0/risc0/zkvm", default-features = false, features = ["std"] }
+wordle-core = { path = "../../core" }

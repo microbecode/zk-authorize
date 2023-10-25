@@ -1,25 +1,68 @@
-#![no_main]
-// If you want to try std support, also update the guest Cargo.toml file
-#![no_std]  // std support is experimental
+// Copyright 2023 RISC Zero, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+#![no_main]
 
 use risc0_zkvm::guest::env;
-//use hello_world_methods::{METHOD_NAME_ELF, METHOD_NAME_ID};
+use risc0_zkvm::sha::{Impl, Sha256};
+use wordle_core::{GameState, LetterFeedback, WordFeedback, WORD_LENGTH};
 
 risc0_zkvm::guest::entry!(main);
 
 pub fn main() {
-     // Load the first number from the host
-     let a: u64 = env::read();
-     // Load the second number from the host
-     let b: u64 = env::read();
- 
-     // Verify that neither of them are 1 (i.e. nontrivial factors)
-     if a == 1 || b == 1 {
-         panic!("Trivial factors")
-     }
- 
-     // Compute the product while being careful with integer overflow
-     let product = a.checked_mul(b).expect("Integer overflow");
-     env::commit(&product);
+    let secret: String = env::read();
+    let guess: String = env::read();
+
+    assert_eq!(
+        secret.chars().count(),
+        WORD_LENGTH,
+        "secret must have length 5!"
+    );
+
+    assert_eq!(
+        guess.chars().count(),
+        WORD_LENGTH,
+        "guess must have length 5!"
+    );
+
+    let mut feedback: WordFeedback = WordFeedback::default();
+
+    // to avoid false positive partial matches, create a pool of only letters
+    // that didn't have an exact match
+    let mut secret_unmatched: String = String::from("");
+
+    for i in 0..WORD_LENGTH {
+        if secret.as_bytes()[i] != guess.as_bytes()[i] {
+            secret_unmatched.push(secret.as_bytes()[i] as char);
+       }
+    }
+
+    // second round for distinguishing partial matches from misses
+    for i in 0..WORD_LENGTH {
+        feedback.0[i] = if secret.as_bytes()[i] == guess.as_bytes()[i] {
+            LetterFeedback::Correct
+        } else if secret_unmatched.as_bytes().contains(&guess.as_bytes()[i]) {
+            LetterFeedback::Present
+        } else {
+            LetterFeedback::Miss
+        }
+    }
+
+    let correct_word_hash = *Impl::hash_bytes(&secret.as_bytes());
+    let game_state = GameState {
+        correct_word_hash,
+        feedback,
+    };
+    env::commit(&game_state);
 }
