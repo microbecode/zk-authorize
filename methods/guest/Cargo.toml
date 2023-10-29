@@ -1,5 +1,5 @@
 [package]
-name = "wordle-guest"
+name = "zkauth-guest"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,4 +7,4 @@ edition = "2021"
 
 [dependencies]
 risc0-zkvm = { path = "../../../risc0/risc0/zkvm", default-features = false, features = ["std"] }
-wordle-core = { path = "../../core" }
+zkauth-core = { path = "../../core" }
