@@ -1,4 +1,4 @@
-# Minimial Zk authorize in the zkVM
+# Minimal Zk authorize in a zkVM
 
 ## About ZK authorize
 
