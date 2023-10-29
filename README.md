@@ -26,3 +26,11 @@ cargo risczero install
 [install Rust]: https://doc.rust-lang.org/cargo/getting-started/installation.html
 
 Also get the Risc0 repository to a separate folder. This project references the folder with a relative path.
+
+## Run minimal test
+
+You can run the one minimal test to see how the functionality works.
+
+It's recommended to run it in developer mode, which disables real proving and only generates hand-wavy proofs. This way the performance is way better for development.
+
+Run the test with: `RISC0_DEV_MODE=1 cargo test`
