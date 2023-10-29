@@ -25,7 +25,7 @@ pub fn main() {
     let mut _balance_user1: u64 = env::read();
     let tx: Transaction = env::read();
 
-    check_policies();
+    check_policies(&tx);
     
 
     // assert_eq!(
@@ -92,7 +92,7 @@ pub fn main() {
     env::commit(&balances);
 }
 
-fn check_policies() {
+fn check_policies(tx : &Transaction) {
     let mut policies: Vec<Box<dyn Policy>> = Vec::new();
 
     policies.push(Box::new(AmountLimitPolicy { max_amount: 1000 }));
