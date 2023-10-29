@@ -17,32 +17,38 @@ mod wordlist;
 use std::io;
 
 use risc0_zkvm::{default_prover, serde::from_slice, sha::Digest, ExecutorEnv, Receipt};
-use wordle_core::{GameState, WordFeedback, WORD_LENGTH};
+use wordle_core::{Balances, Transaction, WordFeedback, WORD_LENGTH};
 use wordle_methods::{WORDLE_GUEST_ELF, WORDLE_GUEST_ID};
 
 // The "server" is an agent in the Wordle game that checks the player's guesses.
-struct Server<'a> {
+struct Server {
     // The server chooses the secret word, and remembers it until the end of the game. It is
     // private because the player shouldn't know the word until the game is over.
-    secret_word: &'a str,
+    balance_user0: u64,
+    balance_user1: u64
 }
 
-impl<'a> Server<'a> {
-    pub fn new(secret_word: &'a str) -> Self {
-        Self { secret_word }
+impl Server {
+    pub fn new() -> Self {
+        Self { 
+            balance_user0: 10_u64, 
+            balance_user1: 10_u64 
+        }
     }
 
-    pub fn get_secret_word_hash(&self) -> Digest {
-        let receipt = self.check_round("_____");
-        let game_state: GameState = from_slice(&receipt.journal).unwrap();
-        game_state.correct_word_hash
-    }
-
-    pub fn check_round(&self, guess_word: &str) -> Receipt {
+    pub fn transfer(&self, source: u64, target: u64, amount: u64) -> Receipt {
+        let tx = Transaction {
+            from: source,
+            to: target,
+            amount: amount
+        };
+        
         let env = ExecutorEnv::builder()
-            .write(&self.secret_word)
+            .write(&self.balance_user0)
             .unwrap()
-            .write(&guess_word)
+            .write(&self.balance_user1)
+            .unwrap()
+            .write(&tx)
             .unwrap()
             .build()
             .unwrap();
@@ -52,83 +58,128 @@ impl<'a> Server<'a> {
 
         // Produce a receipt by proving the specified ELF binary.
         prover.prove_elf(env, WORDLE_GUEST_ELF).unwrap()
+
+        // if source == 0 {
+        //     if target == 1 {
+        //         self.balance_user2 += amount;
+        //         self.balance_user1 -= amount;
+        //     }          
+        // }
+        // else {
+        //     if target == 0 {
+        //         self.balance_user1 += amount;
+        //         self.balance_user2 -= amount;
+        //     }
+        // }
     }
+
+    // pub fn get_secret_word_hash(&self) -> Digest {
+    //     let receipt = self.check_round("_____");
+    //     let game_state: GameState = from_slice(&receipt.journal).unwrap();
+    //     game_state.correct_word_hash
+    // }
+
+    // pub fn check_which_richer(&self) -> Balances {
+    //     let receipt = self.transfer(0, 0, 0);
+    //     let balances: Balances = from_slice(&receipt.journal).unwrap();
+    //     balances
+    // }
+
+    // pub fn check_round(&self, guess_word: &str) -> Receipt {
+    //     let env = ExecutorEnv::builder()
+    //         .write(&self.secret_word)
+    //         .unwrap()
+    //         .write(&guess_word)
+    //         .unwrap()
+    //         .build()
+    //         .unwrap();
+
+    //     // Obtain the default prover.
+    //     let prover = default_prover();
+
+    //     // Produce a receipt by proving the specified ELF binary.
+    //     prover.prove_elf(env, WORDLE_GUEST_ELF).unwrap()
+    // }
 }
 
-// The "player" is an agent in the Wordle game that tries to guess the server's
-// secret word.
-struct Player {
-    // The player remembers the hash of the secret word that the server commits to at the beginning
-    // of the game. By comparing the hash after each guess, the player knows if the server cheated
-    // by changing the word.
-    pub hash: Digest,
-}
+// // The "player" is an agent in the Wordle game that tries to guess the server's
+// // secret word.
+// struct Player {
+//     // The player remembers the hash of the secret word that the server commits to at the beginning
+//     // of the game. By comparing the hash after each guess, the player knows if the server cheated
+//     // by changing the word.
+//     pub hash: Digest,
+// }
 
-impl Player {
-    pub fn check_receipt(&self, receipt: Receipt) -> WordFeedback {
-        receipt
-            .verify(WORDLE_GUEST_ID)
-            .expect("receipt verification failed");
+// impl Player {
+//     pub fn check_receipt(&self, receipt: Receipt) -> WordFeedback {
+//         receipt
+//             .verify(WORDLE_GUEST_ID)
+//             .expect("receipt verification failed");
 
-        let game_state: GameState = from_slice(&receipt.journal).unwrap();
-        if game_state.correct_word_hash != self.hash {
-            panic!("The hash mismatched, so the server cheated!");
-        }
-        game_state.feedback
-    }
-}
+//         let game_state: GameState = from_slice(&receipt.journal).unwrap();
+//         if game_state.correct_word_hash != self.hash {
+//             panic!("The hash mismatched, so the server cheated!");
+//         }
+//         game_state.feedback
+//     }
+// }
 
-fn read_stdin_guess() -> String {
-    let mut guess = String::new();
-    loop {
-        io::stdin().read_line(&mut guess).unwrap();
-        guess.pop(); // remove trailing newline
+// fn read_stdin_guess() -> String {
+//     let mut guess = String::new();
+//     loop {
+//         io::stdin().read_line(&mut guess).unwrap();
+//         guess.pop(); // remove trailing newline
 
-        if guess.chars().count() == WORD_LENGTH {
-            break;
-        } else {
-            println!("Your guess must have 5 letters. Try again :)");
-            guess.clear();
-        }
-    }
-    guess
-}
+//         if guess.chars().count() == WORD_LENGTH {
+//             break;
+//         } else {
+//             println!("Your guess must have 5 letters. Try again :)");
+//             guess.clear();
+//         }
+//     }
+//     guess
+// }
 
-fn play_rounds(server: Server, player: Player, rounds: usize) -> bool {
-    for turn_index in 0..rounds {
-        let remaining_guesses = rounds - turn_index;
-        let guess_word = read_stdin_guess();
-        let receipt = server.check_round(guess_word.as_str());
-        let score = player.check_receipt(receipt);
+// fn play_rounds(server: Server, player: Player, rounds: usize) -> bool {
+//     for turn_index in 0..rounds {
+//         let remaining_guesses = rounds - turn_index;
+//         let guess_word = read_stdin_guess();
+//         let receipt = server.check_round(guess_word.as_str());
+//         let score = player.check_receipt(receipt);
 
-        if remaining_guesses == rounds {
-            println!("Good guess! Our server has calculated your results.");
-            println!("You'll have 6 chances to get the word right.");
-        } else {
-            println!("You have {} guesses remaining.", remaining_guesses);
-        }
+//         if remaining_guesses == rounds {
+//             println!("Good guess! Our server has calculated your results.");
+//             println!("You'll have 6 chances to get the word right.");
+//         } else {
+//             println!("You have {} guesses remaining.", remaining_guesses);
+//         }
 
-        score.print(guess_word.as_str());
-        if score.game_is_won() {
-            return true;
-        }
-    }
-    false
-}
+//         score.print(guess_word.as_str());
+//         if score.game_is_won() {
+//             return true;
+//         }
+//     }
+//     false
+// }
 
 fn main() {
-    println!("Welcome to fair Wordle! Enter a five-letter word.");
+    println!("Welcome to aav! Enter a five-letter word.");
 
-    let server = Server::new(wordlist::pick_word());
-    let player = Player {
-        hash: server.get_secret_word_hash(),
-    };
+    // let server = Server::new();
+    // server.transfer(0, 1, 5);
+    
 
-    if play_rounds(server, player, 6) {
-        println!("You won!\n");
-    } else {
-        println!("Game over!\n");
-    }
+
+    // let player = Player {
+    //     hash: server.get_secret_word_hash(),
+    // };
+
+    // if play_rounds(server, player, 6) {
+    //     println!("You won!\n");
+    // } else {
+    //     println!("Game over!\n");
+    // }
 }
 
 #[cfg(test)]
@@ -136,71 +187,81 @@ mod tests {
     use serial_test::serial;
     use wordle_core::LetterFeedback;
 
-    use crate::{Player, Server};
+    use crate::{Server, Balances};
 
     #[test]
     #[serial]
     fn main() {
-        const TEST_GUESS_WRONG: &str = "roofs";
-        const TEST_GUESS_RIGHT: &str = "proof";
+        let server = Server::new();
+        server.transfer(0, 1, 4);
 
-        let server = Server::new("proof");
-        let player = Player {
-            hash: server.get_secret_word_hash(),
-        };
+        // let bals : Balances = server.get_balances();
+        // println!("a {0} b {1}", bals.balance_user0, bals.balance_user1);
 
-        let guess_word = TEST_GUESS_WRONG;
-        let receipt = server.check_round(&guess_word);
-        let score = player.check_receipt(receipt);
-        assert!(
-            !score.game_is_won(),
-            "Incorrect guess should not win the game"
-        );
-        let guess_word = TEST_GUESS_RIGHT;
-        let receipt = server.check_round(&guess_word);
-        let score = player.check_receipt(receipt);
-        assert!(score.game_is_won(), "Correct guess should win the game");
+        // assert!(bals.balance_user0 == 6, "wrong balance");
+        // assert!(bals.balance_user1 == 14, "wrong balance");
+
     }
+    //     const TEST_GUESS_WRONG: &str = "roofs";
+    //     const TEST_GUESS_RIGHT: &str = "proof";
 
-    /// If a guessed letter is present in every position where it ought to
-    /// appear, and also in an incorrect position, the 'bonus' letter
-    /// shouldn't flag yellow
-    #[test]
-    #[serial]
-    fn test_partial_match_false_positives() {
-        let server = Server::new("spare");
-        let player = Player {
-            hash: server.get_secret_word_hash(),
-        };
+    //     let server = Server::new("proof");
+    //     let player = Player {
+    //         hash: server.get_secret_word_hash(),
+    //     };
 
-        let guess_word = "apple";
-        let receipt = server.check_round(&guess_word);
-        let score = player.check_receipt(receipt);
-        score.print(guess_word);
+    //     let guess_word = TEST_GUESS_WRONG;
+    //     let receipt = server.check_round(&guess_word);
+    //     let score = player.check_receipt(receipt);
+    //     assert!(
+    //         !score.game_is_won(),
+    //         "Incorrect guess should not win the game"
+    //     );
+    //     let guess_word = TEST_GUESS_RIGHT;
+    //     let receipt = server.check_round(&guess_word);
+    //     let score = player.check_receipt(receipt);
+    //     assert!(score.game_is_won(), "Correct guess should win the game");
+    // }
 
-        assert!(
-            score.0[0] == LetterFeedback::Present,
-            "Other partials should be yellow"
-        );
+    // /// If a guessed letter is present in every position where it ought to
+    // /// appear, and also in an incorrect position, the 'bonus' letter
+    // /// shouldn't flag yellow
+    // #[test]
+    // #[serial]
+    // fn test_partial_match_false_positives() {
+    //     let server = Server::new("spare");
+    //     let player = Player {
+    //         hash: server.get_secret_word_hash(),
+    //     };
 
-        assert!(
-            score.0[1] == LetterFeedback::Correct,
-            "Consumed exact matches should be green"
-        );
+    //     let guess_word = "apple";
+    //     let receipt = server.check_round(&guess_word);
+    //     let score = player.check_receipt(receipt);
+    //     score.print(guess_word);
 
-        assert!(
-            score.0[2] == LetterFeedback::Miss,
-            "Excessive instances of letter should not flag yellow"
-        );
+    //     assert!(
+    //         score.0[0] == LetterFeedback::Present,
+    //         "Other partials should be yellow"
+    //     );
 
-        assert!(
-            score.0[1] == LetterFeedback::Correct,
-            "Misses should still miss"
-        );
+    //     assert!(
+    //         score.0[1] == LetterFeedback::Correct,
+    //         "Consumed exact matches should be green"
+    //     );
 
-        assert!(
-            score.0[1] == LetterFeedback::Correct,
-            "Unconsumed matches should be green"
-        );
-    }
+    //     assert!(
+    //         score.0[2] == LetterFeedback::Miss,
+    //         "Excessive instances of letter should not flag yellow"
+    //     );
+
+    //     assert!(
+    //         score.0[1] == LetterFeedback::Correct,
+    //         "Misses should still miss"
+    //     );
+
+    //     assert!(
+    //         score.0[1] == LetterFeedback::Correct,
+    //         "Unconsumed matches should be green"
+    //     );
+    // }
 }

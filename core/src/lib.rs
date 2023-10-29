@@ -34,6 +34,48 @@ pub struct GameState {
     pub feedback: WordFeedback,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct Balances {
+    pub balance_user0: u64,
+    pub balance_user1: u64
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct Transaction {
+    pub from: u64,
+    pub to: u64,
+    pub amount: u64
+}
+
+pub trait Policy {
+    fn is_valid(&self, tx: Transaction) -> bool;
+}
+
+pub struct AmountLimitPolicy {
+    pub max_amount: u64,
+}
+
+pub struct SenderWhitelistPolicy {
+    pub whitelisted_senders: Vec<u64>,
+}
+
+impl Policy for AmountLimitPolicy {
+    fn is_valid(&self, transaction: Transaction) -> bool {
+        transaction.amount <= self.max_amount
+    }
+}
+
+impl Policy for SenderWhitelistPolicy {
+    fn is_valid(&self, transaction: Transaction) -> bool {
+        self.whitelisted_senders.contains(&transaction.from)
+    }
+}
+
+
+
+
+
+
 impl WordFeedback {
     pub fn game_is_won(&self) -> bool {
         self.0.iter().all(|x| *x == LetterFeedback::Correct)
